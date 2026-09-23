@@ -29,6 +29,7 @@ SPRITE_CONFIG_PATH = SPRITE_DIR / "config.yaml"
 WINDOW_SIZE = QSize(190, 190)
 IDLE_AFTER = 0.45
 SLEEP_AFTER = 60.0
+DEFAULT_FRAME_INTERVAL_MS = 180
 
 
 class CatWidget(QWidget):
@@ -60,7 +61,7 @@ class CatWidget(QWidget):
 
         self.frame_timer = QTimer(self)
         self.frame_timer.timeout.connect(self.advance_frame)
-        self.frame_timer.start(180)
+        self.frame_timer.start(load_frame_interval())
 
         self.key_activity.connect(self.on_key_activity)
 
@@ -133,6 +134,16 @@ class CatWidget(QWidget):
             event.accept()
         elif event.button() == Qt.MouseButton.RightButton:
             self.show_context_menu(event.globalPosition().toPoint())
+
+    def mouseDoubleClickEvent(self, event) -> None:
+        """Show a reaction when the cat is double-clicked."""
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.last_key_time = time.monotonic()
+            self.state = "happy"
+            self.message = "더블클릭했음!"
+            self.update()
+            QTimer.singleShot(1400, self.clear_message)
+            event.accept()
 
     def mouseMoveEvent(self, event) -> None:
         if self.drag_offset is not None and event.buttons() & Qt.MouseButton.LeftButton:
@@ -221,6 +232,21 @@ def load_sprite_config() -> dict[str, list[str]]:
     except (OSError, ValueError, yaml.YAMLError):
         pass
     return defaults
+
+
+def load_frame_interval() -> int:
+    """Load the animation frame interval in milliseconds from config.yaml."""
+    if yaml is None or not SPRITE_CONFIG_PATH.is_file():
+        return DEFAULT_FRAME_INTERVAL_MS
+    try:
+        data = yaml.safe_load(SPRITE_CONFIG_PATH.read_text(encoding="utf-8")) or {}
+        value = data.get("frame_interval_ms", DEFAULT_FRAME_INTERVAL_MS)
+        if isinstance(value, bool):
+            return DEFAULT_FRAME_INTERVAL_MS
+        interval = int(value)
+        return interval if interval > 0 else DEFAULT_FRAME_INTERVAL_MS
+    except (OSError, ValueError, TypeError, yaml.YAMLError):
+        return DEFAULT_FRAME_INTERVAL_MS
 
 
 def save_position(position: QPoint) -> None:
